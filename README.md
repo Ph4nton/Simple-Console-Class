@@ -42,5 +42,7 @@ Português:
 
 ## References
 http://www.cplusplus.com/forum/articles/16820/
+
 https://msdn.microsoft.com/pt-br/library/xa1a1a6z.aspx
+
 https://bitismyth.wordpress.com/2017/04/30/charset-e-coisa-seria/
