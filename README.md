@@ -21,7 +21,7 @@ int main()
 
 	Console.SetDefaultColor(ConsoleColor::Gray);
   
-  Console.SetTitle(TEXT("C++ Console Class"));
+  	Console.SetTitle(TEXT("C++ Console Class"));
 
 	Console.Log(TEXT("Hello World!"));
 
