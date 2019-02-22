@@ -5,13 +5,9 @@
 #include <vector>
 #include <tchar.h>
 
-#ifdef UNICODE
-#define STRLEN(s) wcslen(s)
-#else
-#define STRLEN(s) strlen(s)
-#endif //You can use _tcslen
+#define CONSOLE_DEFAULT_COLOR ConsoleColor::Gray
 
-#define LITERALS	TEXT("\r\n")
+#define FILE_TYPE TEXT("txt")
 
 //used only in the console
 enum ConsoleColor : WORD 
@@ -37,26 +33,26 @@ enum ConsoleColor : WORD
 class CConsole
 {
 public:
-	//Constructor
-	CConsole();
-
-	//Destructor
-	~CConsole();
-
 	//Initilize console and log file
-	void Init(bool Console, bool LogFile);
+	void Init(bool Console = false, bool LogFile = false);
 
 	//Set console title
 	bool SetTitle(LPCTSTR Title);
 
 	//Set console default color
-	void SetDefaultColor(WORD Color);
+	bool SetDefaultColor(WORD Color);
+
+	//Set console font
+	bool SetConsoleFont(LPCTSTR Name, SHORT Size = 16, UINT Weight = FW_NORMAL);
 
 	//Log in console and log file
 	void Log(LPCTSTR format, ...);
 
 	//Log with color
 	void Log(ConsoleColor Color, LPCTSTR format, ...);
+
+	//Release
+	void Release();
 
 private:
 	//Edit console attribute color
@@ -72,18 +68,15 @@ private:
 	LPTSTR GetTimeNow();
 
 protected:
-	//Text buffer
-	TCHAR buffer[0xff];
+	//Module Path
+	TCHAR ModulePath[0xff];
 
 	//Default color value
-	WORD defColor;
+	WORD default_color;
 
 	//Console and file HANDLE
 	HANDLE hConsole, hFile;
 
 	//Console and file boolean 
-	bool IsConsole, IsLogFile;
-
-	//Time struct
-	SYSTEMTIME sys_time;
+	bool IsLogConsole, IsLogFile;
 };
