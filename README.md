@@ -15,19 +15,23 @@ A simple and useful Win c++ console class
 
 int main()
 {
-  CConsole Console;
+  	CConsole Console;
 
 	Console.Init(true, true); //void Init(bool Console, bool LogFile);
 
 	Console.SetDefaultColor(ConsoleColor::Gray);
   
   	Console.SetTitle(TEXT("C++ Console Class"));
+	
+	Console.SetConsoleFont(TEXT("Consolas"), 16, FW_NORMAL);
 
 	Console.Log(TEXT("Hello World!"));
 
 	Console.Log(TEXT("%s, %i, %f"), TEXT("String"), (int)2 + 2, (float)123.456);
 
 	Console.Log(ConsoleColor::Green, TEXT("Simple colored string"));
+
+	Console.Release();
 
 	return 0;
 }
