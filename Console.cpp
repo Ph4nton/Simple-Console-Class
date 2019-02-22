@@ -1,80 +1,72 @@
 #include "Console.h"
 
-CConsole::CConsole()
-{
-	this->hConsole = NULL;
-	this->hFile = NULL;
+#ifdef UNICODE
+#define STRLEN(s) wcslen(s)
+#else
+#define STRLEN(s) strlen(s)
+#endif //You can use _tcslen
 
-	this->IsConsole = false;
+#define LITERALS	TEXT("\r\n")
+
+void CConsole::Release()
+{
+	this->IsLogConsole = false;
 	this->IsLogFile = false;
 
-	defColor = 0;
+	default_color = 0;
 
-	sys_time = SYSTEMTIME();
-
-	//clear buffer
-	memset(buffer, 0, sizeof(buffer));
-}
-
-CConsole::~CConsole()
-{
-	this->hConsole = NULL;
-	this->hFile = NULL;
-
-	this->IsConsole = false;
-	this->IsLogFile = false;
-
-	defColor = 0;
-
-	sys_time = SYSTEMTIME();
-
-	//clear buffer
-	memset(buffer, 0, sizeof(buffer));
+	//clear module path
+	memset(ModulePath, 0, sizeof(ModulePath));
 
 	//free console
 	FreeConsole();
 
-	//Close console HANDLE
-	CloseHandle(this->hConsole);
-
 	//End of file
 	SetEndOfFile(this->hFile);
 
+	//Close console HANDLE
+	if (this->hConsole)
+	{
+		this->hConsole = nullptr;
+	}
+
 	//close file HANDLE
-	CloseHandle(this->hFile);
+	if (this->hFile)
+	{
+		CloseHandle(this->hFile);
+		this->hFile = nullptr;
+	}
 }
 
 void CConsole::Init(bool Console, bool LogFile)
 {
-	this->IsConsole = Console;
+	this->IsLogConsole = Console;
 	this->IsLogFile = LogFile;
 
-	if (this->IsConsole)
+	if (Console)
 	{
 		//Enable Console
 		AllocConsole();
 
 		//Set default console color
-		SetDefaultColor(ConsoleColor::Gray);
+		SetDefaultColor(CONSOLE_DEFAULT_COLOR);
 
 		//Get Console Handle
 		hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
 	}
 
-	if (this->IsLogFile)
+	if (LogFile)
 	{
-		TCHAR ModulePath[0xff];
-
 		//get full module path and length
-		DWORD length = GetModuleFileName(NULL, ModulePath, 0xff);
+		DWORD length = GetModuleFileName(NULL, this->ModulePath, 0xff);
 
 		//changer exterion type
-		ModulePath[length - 1] = TEXT('t');
-		ModulePath[length - 2] = TEXT('x');
-		ModulePath[length - 3] = TEXT('t');
+		this->ModulePath[length - 1] = FILE_TYPE[0];
+		this->ModulePath[length - 2] = FILE_TYPE[1];
+		this->ModulePath[length - 3] = FILE_TYPE[2];
 
 		//create output log in module directory
-		hFile = CreateFile(ModulePath, GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+		hFile = CreateFile(this->ModulePath, GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 	}
 }
 
@@ -83,12 +75,12 @@ bool CConsole::SetTitle(LPCTSTR Title)
 	return SetConsoleTitle(Title);
 }
 
-void CConsole::SetDefaultColor(WORD Color)
+bool CConsole::SetDefaultColor(WORD Color)
 {
 	//use ternary operator
-	this->defColor = Color ? Color : Gray;
+	this->default_color = Color;
 
-	this->SetConsoleColor(this->defColor);
+	return SetConsoleColor(this->default_color);
 }
 
 bool CConsole::SetConsoleColor(WORD Color)
@@ -96,10 +88,35 @@ bool CConsole::SetConsoleColor(WORD Color)
 	return SetConsoleTextAttribute(this->hConsole, Color);
 }
 
+bool CConsole::SetConsoleFont(LPCTSTR Name, SHORT Size, UINT Weight)
+{
+	TCHAR font_name[32];
+
+#ifdef UNICODE
+	wcscpy_s(font_name, 32, Name);
+#else
+	strcpy_s(font_name, 32, Name);
+#endif
+
+	CONSOLE_FONT_INFOEX fInfo;
+
+	fInfo.cbSize = sizeof(CONSOLE_FONT_INFOEX);
+	fInfo.nFont = 0;
+	fInfo.dwFontSize = { 0, Size };
+	fInfo.FontFamily = TMPF_VECTOR;
+	fInfo.FontWeight = Weight; //FW_LIGHT, FW_NORMAL, FW_BOLD
+	std::copy(font_name, font_name + (sizeof(font_name) / sizeof(TCHAR)), fInfo.FaceName);
+
+	return SetCurrentConsoleFontEx(this->hConsole, false, &fInfo);
+}
+
 void CConsole::Log(LPCTSTR format, ...)
 {
-	if (!IsConsole && !IsLogFile)
+	if (!IsLogConsole && !IsLogFile)
 		return;
+
+	//Text buffer
+	TCHAR buffer[0xff] = { 0 };
 
 	//Variadic function
 	va_list args;
@@ -110,7 +127,7 @@ void CConsole::Log(LPCTSTR format, ...)
 	//get current time
 	LPTSTR bufftime = this->GetTimeNow();
 
-	if (IsConsole)
+	if (IsLogConsole)
 	{
 		//write time
 		this->WriteInConsole(bufftime);
@@ -143,8 +160,11 @@ void CConsole::Log(LPCTSTR format, ...)
 
 void CConsole::Log(ConsoleColor Color, LPCTSTR format, ...)
 {
-	if (!IsConsole && !IsLogFile)
+	if (!IsLogConsole && !IsLogFile)
 		return;
+
+	//Text buffer
+	TCHAR buffer[0xff] = { 0 };
 
 	//Variadic function
 	va_list args;
@@ -152,58 +172,37 @@ void CConsole::Log(ConsoleColor Color, LPCTSTR format, ...)
 	_vstprintf_s(buffer, format, args);
 	va_end(args);
 
-	//get current time
-	LPTSTR bufftime = this->GetTimeNow();
+	SetConsoleColor(Color);
 
-	if (IsConsole)
-	{
-		//write time
-		this->WriteInConsole(bufftime);
+	this->Log(buffer);
 
-		//set console color atributs
-		this->SetConsoleColor(Color);
-
-		//write buffer
-		this->WriteInConsole(buffer);
-
-		//tab and break line
-		this->WriteInConsole(LITERALS);
-
-		//restore color
-		this->SetConsoleColor(this->defColor);
-	}
-
-	if (IsLogFile)
-	{
-		//write time in log file
-		this->WriteInFile(bufftime);
-
-		//write buffer in log file
-		this->WriteInFile(buffer);
-
-		//tab and break line in log file
-		this->WriteInFile(LITERALS);
-	}
+	SetConsoleColor(this->default_color);
 
 	//clear buffer
 	memset(buffer, 0, sizeof(buffer));
-
-	//clear buffer
-	memset(bufftime, 0, sizeof(bufftime));
 }
 
 bool CConsole::WriteInConsole(LPCTSTR buffer)
 {
-	return WriteConsole(this->hConsole, buffer, STRLEN(buffer), NULL, NULL);
+	if (this->hConsole == NULL)
+		return false;
+
+	if (this->hConsole == INVALID_HANDLE_VALUE)
+		return false;
+
+	return WriteConsole(this->hConsole, buffer, (DWORD)STRLEN(buffer), NULL, NULL);
 }
 
 #ifdef UNICODE
 bool CConsole::WriteInFile(LPCTSTR buffer)
 {
+	if (this->hFile == NULL)
+		return false;
+
 	if (this->hFile == INVALID_HANDLE_VALUE)
 		return false;
 
-	unsigned char Header[2];
+	unsigned char Header[2]; //UTF-16 BOM
 
 	Header[0] = 0xFF;
 
@@ -220,22 +219,29 @@ bool CConsole::WriteInFile(LPCTSTR buffer)
 #else
 bool CConsole::WriteInFile(LPCTSTR string)
 {
+	if (this->hFile == NULL)
+		return false;
+
 	if (this->hFile == INVALID_HANDLE_VALUE)
 		return false;
 
-	return WriteFile(this->hFile, (LPCVOID)buffer, STRLEN(buffer) * sizeof(TCHAR), NULL, NULL);
+	return WriteFile(this->hFile, string, (DWORD)STRLEN(string), NULL, NULL);
 }
 #endif
 
 LPTSTR CConsole::GetTimeNow()
 {
-	TCHAR tbuffer[0xff];
+	static TCHAR tbuffer[0xff];
 
-	GetLocalTime(&sys_time);
+	//Time struct
+	SYSTEMTIME time = SYSTEMTIME();
 
-	_stprintf_s(tbuffer, TEXT("<%02d:%02d:%02d> "), sys_time.wHour, sys_time.wMinute, sys_time.wSecond);
+	//Get local time
+	GetLocalTime(&time);
 
-	sys_time = SYSTEMTIME();
+	//formart time text
+	_stprintf_s(tbuffer, sizeof(tbuffer), TEXT("<%02d:%02d:%02d> "), time.wHour, time.wMinute, time.wSecond);
 
+	//return buffer
 	return tbuffer;
 }
