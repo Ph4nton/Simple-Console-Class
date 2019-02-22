@@ -1,9 +1,10 @@
 # Simple-Console-Class
-A simple and useful Win c++ console class
+A simple and useful Win x86 and x64 C++ console class
 
 ## Features
 + Edit console title
-+ Edit text color
++ Edit console text color
++ Edit console font
 + Output log file
 + Support Win x64/x86
 + Support Multi Byte and Unicode
